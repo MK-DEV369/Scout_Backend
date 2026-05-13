@@ -1,0 +1,718 @@
+openapi: 3.0.0
+info:
+  title: Co2 Calculation API
+  version: v1.0
+  description: '<p>The goal of the Freightos CO2 emissions calculator is to provide an API for estimating the emissions of freight transportation across modes, in accordance with the European standard <a href="https://www.en-standard.eu/csn-en-16258-methodology-for-calculation-and-declaration-of-energy-consumption-and-ghg-emissions-of-transport-services-freight-and-passengers/" target="_blank">EN 16258</a> <i>Methodology for calculation and declaration of energy consumption and GHG emissions of transport services (freight and passengers).</i></p>
+    <p>Freight is a large emitter of greenhouse gasses. According to <a href="https://www.itf-oecd.org/sites/default/files/docs/cop-pdf-06.pdf" target="_blank">The Carbon Footprint of Global Trade</a> by the International Transport Forum of the OECD, freight transportation is responsible for 2.1 billion tonnes of CO2 equivalent emissions per year, or 7% of the world total emissions. Worse, this may increase to over 8 billion tonnes by 2050.</p>
+    <p>Freightos is providing this calculator in the hope that it will help companies to track their Scope 3 emissions and find ways to reduce their carbon footprint.
+    </p>
+    <p>Estimating carbon emissions is complex. This tool is provided “as is” in an effort to make estimates in accordance with the guidance of the relevant standard. But actual emissions may vary considerably. The standard recognizes this and accepts that in many cases the shipper has no data on the specific vessel used and its load factor, and therefore estimates may be made based on industry average default values.</p><hr/>
+    <p>The Freightos carbon emissions APIs are in <b><u>Beta</u></b> and are currently provided for free, as-is, with no warranty of any kind, for market feedback, or informational or educational purposes only, subject to the <a href="https://www.webcargo.co/terms-of-service/" target="_blank">Freightos WebCargo Terms of Service</a> for APIs (see Annex D of the Terms of Service).</p>
+  '
+servers:
+  - url: https://api.freightos.com/api/v1
+  - url: https://sandbox.freightos.com/api/v1
+security:
+  - ApiKeyAuth: []    
+paths:
+  "/co2calc":
+    post:
+      tags:
+        - Co2 Emission Estimator
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Shipment'
+            examples:
+              FCL:
+                summary: Example of a FCL shipment
+                value:
+                  load: 
+                  - quantity: 2
+                    unitType: container40
+                  - quantity: 1
+                    unitType: container20
+                  legs: 
+                  - mode: FCL
+                    origin:
+                      unLocationCode: GBFXT
+                    destination:
+                      unLocationCode: USNYC
+                    carrierCode: MEAU
+              LCL:
+                summary: Example of a LCL shipment
+                value:
+                  load: 
+                  - quantity: 3
+                    unitVolumeCBM: 1.5
+                    unitType: pallets
+                  - quantity: 3
+                    unitVolumeCBM: 4.5
+                    unitType: boxes
+                  legs: 
+                  - mode: LCL
+                    origin:
+                      unLocationCode: GBFXT
+                    destination:
+                      unLocationCode: USNYC
+                    carrierCode: MEAU
+              LTL:
+                summary: An example of LTL shipment
+                value:
+                  load:
+                  - quantity: 3
+                    unitWeightKg: 123.45
+                    unitType: pallets
+                  - quantity: 3
+                    unitWeightKg: 123.45
+                    unitType: boxes
+                  legs:
+                  - mode: LTL
+                    origin:
+                      longitude: -0.12810422287025974
+                      latitude: 51.51132822627623
+                    destination:
+                      longitude: -3.188174041248701
+                      latitude: 55.959066002413515
+                    carrierCode: MEAU
+              AIRLTL:
+                summary: An example of AIR + LTL shipment
+                value:
+                  load:
+                  - quantity: 3
+                    unitWeightKg: 123.45
+                    unitType: pallets
+                  - quantity: 3
+                    unitWeightKg: 123.45
+                    unitType: boxes
+                  legs:
+                  - mode: air
+                    origin:
+                      airportCode: LHR
+                    destination:
+                      airportCode: JFK
+                    carrierCode: BA
+                    voyageNumber: BA123
+                    vesselModel: '737'
+                    freighter: 0
+                  - mode: LTL
+                    origin:
+                     airportCode: JFK
+                    destination:
+                      airportCode: BOS
+                    kgCO2ePerTonKm: 0.605
+              AIR:
+                summary: An example of AIR shipment
+                value:
+                  load:
+                  - quantity: 1
+                    unitWeightKg: 123.45
+                    unitType: pallets
+                  - quantity: 2
+                    unitWeightKg: 123.45
+                    unitType: boxes
+                  legs:
+                  - mode: air
+                    origin:
+                      airportCode: LHR
+                    destination:
+                      airportCode: JFK
+                    carrierCode: BA
+                    voyageNumber: BA123
+                    vesselModel: '737'
+                    freighter: 0
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ShipmentFootprintReport'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestFaultMessage'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedFaultMessage'
+        '500':
+          description: Internal Communication Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalFaultMessage'
+
+                
+  "/co2hc":
+   get:
+    tags:
+      - Co2 API Health Check
+    responses:
+      '200':
+        description: OK
+      '401':
+        description: Unauthorized
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnauthorizedFaultMessage'
+      '500':
+          description: Internal server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalFaultMessage'
+        
+      
+components:
+  securitySchemes:
+    ApiKeyAuth:        # arbitrary name for the security scheme
+      type: apiKey
+      in: header       # can be "header", "query" or "cookie"
+      name: x-apikey
+  examples:
+    FCL:
+      summary: An example of FCL shipment
+      value:
+        load: 
+          - quantity: 2
+            unitType: container40
+          - quantity: 1
+            unitType: container20
+        legs: 
+          - mode: FCL
+            origin:
+             unLocationCode: GBFXT
+            destination:
+             unLocationCode: USNYC
+            carrierCode: MEAU
+    LCL:
+      summary: An example of LCL shipment
+      value:
+        load: 
+          - quantity: 3
+            unitVolumeCBM: 1.5
+            unitType: pallets
+          - quantity: 3
+            unitVolumeCBM: 4.5
+            unitType: boxes
+        legs: 
+          - mode: LCL
+            origin:
+             unLocationCode: GBFXT
+            destination:
+             unLocationCode: USNYC
+            carrierCode: MEAU
+    LTL:
+      summary: An example of LTL shipment
+      value:
+        load:
+        - quantity: 3
+          unitWeightKg: 123.45
+          unitType: pallets
+        - quantity: 3
+          unitWeightKg: 123.45
+          unitType: boxes
+        legs:
+        - mode: LTL
+          origin:
+            longitude: -0.12810422287025974
+            latitude: 51.51132822627623
+          destination:
+            longitude: -3.188174041248701
+            latitude: 55.959066002413515
+          carrierCode: MEAU
+    AIRLTL:
+      summary: An example of AIR + LTL shipment
+      value:
+        load:
+        - quantity: 3
+          unitWeightKg: 123.45
+          unitType: pallets
+        - quantity: 3
+          unitWeightKg: 123.45
+          unitType: boxes
+        legs:
+        - mode: air
+          origin:
+            airportCode: LHR
+          destination:
+            airportCode: JFK
+          carrierCode: BA
+          voyageNumber: BA123
+          vesselModel: '737'
+          freighter: 0
+        - mode: LTL
+          origin:
+            airportCode: JFK
+          destination:
+            airportCode: BOS
+          kgCO2ePerTonKm: 0.605
+  schemas:
+    LongLatLocation:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Location'
+        - type: object
+          properties:
+            longitude:
+               type: number
+               example: -0.12810422287025974
+            latitude:
+               type: number
+               example: 51.51132822627623
+
+    GooglePlaceID:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Location'
+        - type: object
+          properties:
+            googlePlaceId:
+              type: string
+              example: "ChIJVXealLU_xkcRja_At0z9AGY"
+    
+    Address:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Location'
+        - type: object
+          properties:
+            address:
+              type: string
+              example: "Broughton Pl, Edinburgh EH1 3RT, UK"
+              
+    Airport:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Location'
+        - type: object
+          properties:
+            airportCode:
+              type: string
+              example: "JFK"
+    Leg:
+      required:
+        - destination
+        - origin
+      type: object
+      properties:
+        origin:
+          oneOf:
+            - $ref: '#/components/schemas/Airport'
+            - $ref: '#/components/schemas/GooglePlaceID'
+            - $ref: '#/components/schemas/LongLatLocation'
+            - $ref: '#/components/schemas/Seaport'
+            - $ref: '#/components/schemas/Address'
+        destination:
+          oneOf:
+            - $ref: '#/components/schemas/Airport'
+            - $ref: '#/components/schemas/GooglePlaceID'
+            - $ref: '#/components/schemas/LongLatLocation'
+            - $ref: '#/components/schemas/Seaport'
+            - $ref: '#/components/schemas/Address'
+        mode:
+          type: string
+          enum:
+            - air
+            - FCL
+            - FCL_reefer
+            - LCL
+            - LTL
+            - rail
+            - barge
+            - roRo
+            - express
+        carrier:
+          maxLength: 5
+          minLength: 0
+          type: string
+          description: 2 char IATA code of an airline or 4 char SCAC code of an ocean liner. May be used in future to make the calculation more specific.
+          example: '"AA",  "MAEU"'
+          enum:
+            - AA
+            - AF
+            - AI
+            - AT
+            - AV
+            - AY
+            - AZ
+            - BA
+            - CA
+            - CV
+            - CX
+            - DE
+            - DL
+            - EK
+            - EY
+            - FB
+            - FI
+            - FX
+            - IB
+            - KL
+            - LA
+            - LH
+            - MS
+            - OK
+            - PC
+            - PS
+            - QR
+            - R5
+            - RU
+            - SK
+            - SQ
+            - SV
+            - TK
+            - TP
+            - UA
+            - UX
+            - VN
+            - WY
+            - X3
+            - NH
+            - VY
+            - P3
+            - QJ
+            - 3U
+            - BR
+            - MP
+            - BT
+            - KF
+            - SN
+            - OS
+            - RC
+            - XQ
+            - WF
+            - TB
+            - EI
+            - ACLU
+            - ANRM
+            - AKMR
+            - ANNU
+            - APLU
+            - ARKU
+            - AROF
+            - NSAU
+            - BCLU
+            - CEGL
+            - CNIU
+            - CPJQ
+            - CMDU
+            - 11DX
+            - COSU
+            - CMCU
+            - CAMN
+            - CHIW
+            - NSLU
+            - CHNJ
+            - DAAE
+            - DOLQ
+            - EQLI
+            - EIMU
+            - EIMW
+            - ESPU
+            - EUKO
+            - EGLV
+            - FESO
+            - GFAL
+            - ACSU
+            - GRIU
+            - GSLU
+            - UBCU
+            - GESC
+            - SUDU
+            - HLCU
+            - HDMU
+            - HUAU
+            - HRZU
+            - HYDU
+            - IILU
+            - IDMC
+            - INOC
+            - KKLU
+            - KOSL
+            - KMTU
+            - CLIB
+            - LGLT
+            - LMCU
+            - MAEU
+            - MFTU
+            - MRUB
+            - MATS
+            - MCCQ
+            - MISC
+            - MSCU
+            - NIDU
+            - NOSU
+            - NODA
+            - ONEY
+            - OOLU
+            - PSHI
+            - PCIU
+            - PMOL
+            - PLLU
+            - RCKI
+            - SAFM
+            - SLAQ
+            - SKII
+            - SCIU
+            - SMLU
+            - SEFN
+            - SEJJ
+            - SCYE
+            - SKLU
+            - CHVW
+            - THZS
+            - TOHO
+            - TOTE
+            - TRKU
+            - UALC
+            - USLU
+            - WECU
+            - WWSU
+            - 22AA
+            - WDLS
+            - WLWH
+            - YMLU
+            - ZIMU
+        voyageNumber:
+          type: string
+          description: Flight number of sea voyage number. May be used in future to make the calculation more specific.
+          example: '"AA123"'
+        vesselModel:
+          type: string
+          description: Model number of vessel. May be used in future to make the calculation more specific.
+          example: '"737"'
+        freighter:
+          type: boolean
+          description: For air only, true for a dedicated freighter aircraft, false for passenger. May be used in future to make the calculation more specific.
+          example: false
+        compoundLeg:
+          type: boolean
+          description: 'True if this leg is likely to be a compound leg e.g. door-to-door movement which spilts into truck-ship-truck. False if it is definitely one single carrier leg. Default/null: Infer automatically.'
+        Ew:
+          type: number
+          description: Total kilograms of CO2 equivalent GHG emissions (well-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Gw:
+          type: number
+          description: Total energy consumption (well-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Et:
+          type: number
+          description: Total kilograms of CO2 equivalent GHG emissions (tank-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Gt:
+          type: number
+          description: Total energy consumption (tank-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Ew_per_unit_per_km:
+          type: number
+          description: Total kilograms of CO2 equivalent GHG emissions (well-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Gw_per_unit_per_km:
+          type: number
+          description: Total energy consumption (well-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Et_per_unit_per_km:
+          type: number
+          description: Total kilograms of CO2 equivalent GHG emissions (tank-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        Gt_per_unit_per_km:
+          type: number
+          description: Total energy consumption (tank-to-wheels) for this leg if known. If ommitted an estimate will be calculated.
+          format: double
+        gw:
+          type: number
+          format: double
+        ew:
+          type: number
+          format: double
+        et:
+          type: number
+          format: double
+        gt:
+          type: number
+          format: double
+        et_per_unit_per_km:
+          type: number
+          format: double
+        ew_per_unit_per_km:
+          type: number
+          format: double
+        gw_per_unit_per_km:
+          type: number
+          format: double
+        gt_per_unit_per_km:
+          type: number
+          format: double
+    LoadUnit:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          format: int32
+        unitType:
+          type: string
+          enum:
+            - boxes
+            - crate
+            - envelope
+            - pallets
+            - container20
+            - container40
+            - container40HC
+            - container45HC
+            - container53
+            - LD1
+            - LD2
+            - LD3
+            - LD5
+            - LD6
+            - LD7
+            - LD8
+            - LD9
+            - LD11
+        unitWeightKg:
+          type: number
+          format: double
+        unitVolumeCBM:
+          type: number
+          format: double
+      description: A list of the load units (pallets or containers etc.) being shipped
+      example: '737'
+    Location:
+      type: object
+      description: End point of shipment. Note specific schemes for airport, searport or longitude/latitude
+    Seaport:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Location'
+        - type: object
+          properties:
+            unLocationCode:
+              type: string
+              example: "USNYC"
+    Shipment:
+      type: object
+      properties:
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Leg'
+        load:
+          type: array
+          description: A list of the load units (pallets or containers etc.) being shipped
+          example: '737'
+          items:
+            $ref: '#/components/schemas/LoadUnit'
+    CO2CalcDataLeg:
+      type: object
+      properties:
+        title:
+          type: string
+        Ew:
+          type: number
+          format: double
+        Gw:
+          type: number
+          format: double
+        Et:
+          type: number
+          format: double
+        Gt:
+          type: number
+          format: double
+    ShipmentFootprintReport:
+      type: object
+      properties:
+        title:
+          type: string
+        Ew:
+          type: number
+          format: double
+        Gw:
+          type: number
+          format: double
+        Et:
+          type: number
+          format: double
+        Gt:
+          type: number
+          format: double
+        legsData:
+          type: array
+          items:
+            $ref: '#/components/schemas/CO2CalcDataLeg'
+        shortDeclaration:
+          type: string
+        report:
+          type: string
+    UnauthorizedFaultMessage:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: '401'
+              reason: 
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: Unauthorized
+    BadRequestFaultMessage:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: '400'
+              reason: 
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: Bad Request
+    InternalFaultMessage:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: '500'
+              reason: 
+                type: object
+                properties:
+                  value:
+                    type: string
+                    example: Internal Communication Error
+
+          

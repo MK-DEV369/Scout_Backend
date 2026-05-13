@@ -29,10 +29,18 @@ class DatabricksClient:
         return resp.json()
 
 def trigger_default_job() -> Dict[str, Any]:
+    # Skip if Databricks credentials not configured
+    if not settings.databricks_token:
+        return {
+            "triggered": False,
+            "reason": "Databricks token not configured (set DATABRICKS_TOKEN env var)",
+        }
+    
     if not settings.databricks_default_job_id:
         raise RuntimeError("No default Databricks job id configured")
-    client = DatabricksClient()
+    
     try:
+        client = DatabricksClient()
         return client.run_job(int(settings.databricks_default_job_id))
     except requests.HTTPError as exc:
         response = exc.response
@@ -40,5 +48,10 @@ def trigger_default_job() -> Dict[str, Any]:
             "triggered": False,
             "job_id": settings.databricks_default_job_id,
             "status_code": getattr(response, "status_code", None),
+            "error": str(exc),
+        }
+    except RuntimeError as exc:
+        return {
+            "triggered": False,
             "error": str(exc),
         }

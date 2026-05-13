@@ -12,7 +12,7 @@ class NewsAPIConnector(SourceConnector):
 
     async def fetch(self) -> list[NormalizedRecord]:
         if not settings.newsapi_key:
-            return []
+            raise RuntimeError("NEWSAPI_KEY is not configured")
 
         params = {
             "q": "supply chain OR commodity OR conflict",

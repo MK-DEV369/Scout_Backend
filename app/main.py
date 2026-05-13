@@ -36,10 +36,8 @@ async def lifespan(app: FastAPI):
     try:
         databricks_result = trigger_default_job()
         if not databricks_result.get("triggered", True):
-            logger.warning(
-                "Databricks startup job was not triggered: %s",
-                databricks_result,
-            )
+            reason = databricks_result.get("reason") or databricks_result.get("error", "Unknown reason")
+            logger.info("Databricks startup job skipped: %s", reason)
     except Exception:
         logger.exception("Failed to trigger Databricks job on startup")
 
@@ -58,14 +56,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix=settings.api_v1_prefix)
-app.include_router(ml_router, prefix=settings.api_v1_prefix)
-app.include_router(phase_router, prefix=settings.api_v1_prefix)
-app.include_router(graph_router, prefix=settings.api_v1_prefix)
+app.include_router(api_router)
+app.include_router(ml_router)
+app.include_router(phase_router)
+app.include_router(graph_router)
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
-
-
-# replaced deprecated startup event with FastAPI lifespan handler

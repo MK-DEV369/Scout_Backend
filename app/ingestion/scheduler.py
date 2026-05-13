@@ -20,10 +20,10 @@ async def run_ingestion_job() -> dict:
     except TimeoutError:
         logger.warning("Ingestion collect timed out after %s seconds", settings.ingestion_job_timeout_seconds)
         return {
+            "status": "error",
             "fetched_total": 0,
             "inserted": 0,
             "duplicates": 0,
-            "fallback_saved": 0,
             "error_count": 1,
             "source_counts": {},
             "errors": [{"source": "scheduler", "error": "ingestion job timeout"}],
@@ -33,21 +33,25 @@ async def run_ingestion_job() -> dict:
         with SessionLocal() as db:
             save_result = ingestion_service.save(db, records)
     except Exception as exc:  # noqa: BLE001
-        fallback_saved = ingestion_service.save_fallback(records, reason=f"db_session_error:{exc}")
         logger.exception("DB session failed during ingestion job", exc_info=exc)
-        save_result = {
+        return {
+            "status": "error",
+            "fetched_total": len(records),
             "inserted": 0,
             "duplicates": 0,
-            "fallback_saved": fallback_saved,
+            "error_count": len(errors) + 1,
+            "source_counts": source_counts,
+            "errors": errors + [{"source": "database", "error": str(exc)}],
             "db_error": str(exc),
         }
 
+    status = "ok" if not errors else "partial_failure"
+
     return {
+        "status": status,
         "fetched_total": len(records),
         "inserted": save_result["inserted"],
         "duplicates": save_result["duplicates"],
-        "fallback_saved": save_result.get("fallback_saved", 0),
-        "db_error": save_result.get("db_error"),
         "error_count": len(errors),
         "source_counts": source_counts,
         "errors": errors,

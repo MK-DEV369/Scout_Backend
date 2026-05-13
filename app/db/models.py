@@ -54,6 +54,7 @@ class EventRecord(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     category: Mapped[str] = mapped_column(String(60), index=True)
     summary: Mapped[str] = mapped_column(Text)
+    summary_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     severity: Mapped[float] = mapped_column(Float, default=0.5)
     entities_json: Mapped[dict] = mapped_column(JSON, default=dict)

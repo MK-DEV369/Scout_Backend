@@ -4,10 +4,21 @@ from sqlalchemy.orm import Session
 from app.db.models import EventRecord, UnifiedRecord
 from app.nlp.entity_extractor import extract_entities
 from app.nlp.event_classifier import classify_event
+from app.nlp.schemas import ExtractedEntities, EntityWithConfidence
 from app.nlp.summarizer import summarize_as_bullets
 
 
-def build_structured_events(db: Session, limit: int = 100) -> dict[str, int]:
+def filter_entities_by_confidence(entities: ExtractedEntities, min_confidence: float = 0.7) -> ExtractedEntities:
+    """Filter entities to only include those with confidence >= min_confidence."""
+    return ExtractedEntities(
+        companies=[e for e in entities.companies if e.confidence >= min_confidence],
+        countries=[e for e in entities.countries if e.confidence >= min_confidence],
+        ports=[e for e in entities.ports if e.confidence >= min_confidence],
+        commodities=[e for e in entities.commodities if e.confidence >= min_confidence],
+    )
+
+
+def build_structured_events(db: Session, limit: int = 100, entity_confidence_threshold: float = 0.7) -> dict[str, int]:
     processed_ids = {
         row[0]
         for row in db.execute(select(EventRecord.unified_record_id)).all()
@@ -26,8 +37,9 @@ def build_structured_events(db: Session, limit: int = 100) -> dict[str, int]:
             continue
 
         entities = extract_entities(record.text)
+        entities = filter_entities_by_confidence(entities, min_confidence=entity_confidence_threshold)
         category, confidence, classifier_model = classify_event(record.text)
-        summary = summarize_as_bullets(record.text)
+        summary, summary_confidence = summarize_as_bullets(record.text)
 
         event = EventRecord(
             unified_record_id=record.id,
@@ -35,6 +47,7 @@ def build_structured_events(db: Session, limit: int = 100) -> dict[str, int]:
             timestamp=record.timestamp,
             category=category,
             summary=summary,
+            summary_confidence=summary_confidence,
             location=record.location,
             severity=min(max(confidence, 0.0), 1.0),
             entities_json=entities.model_dump(),

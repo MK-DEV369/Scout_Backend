@@ -1,17 +1,24 @@
+import logging
 from neo4j import GraphDatabase
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class GraphService:
     def __init__(self) -> None:
         self._driver = None
         self._database = settings.neo4j_database
+        self._indexes_created = False
         if settings.neo4j_uri and settings.neo4j_user and settings.neo4j_password:
-            self._driver = GraphDatabase.driver(
-                settings.neo4j_uri,
-                auth=(settings.neo4j_user, settings.neo4j_password),
-            )
-            self._ensure_indexes()
+            try:
+                self._driver = GraphDatabase.driver(
+                    settings.neo4j_uri,
+                    auth=(settings.neo4j_user, settings.neo4j_password),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create Neo4j driver during init: {e}")
+                self._driver = None
 
     @property
     def enabled(self) -> bool:
@@ -26,22 +33,28 @@ class GraphService:
         return self._database
 
     def _ensure_indexes(self) -> None:
-        if not self._driver:
+        if not self._driver or self._indexes_created:
             return
 
-        statements = [
-            "CREATE INDEX risk_event_id_index IF NOT EXISTS FOR (e:RiskEvent) ON (e.event_id)",
-            "CREATE INDEX supplier_id_index IF NOT EXISTS FOR (s:Supplier) ON (s.supplier_id)",
-            "CREATE INDEX manufacturer_id_index IF NOT EXISTS FOR (m:Manufacturer) ON (m.manufacturer_id)",
-        ]
-        with self._driver.session(database=self._database) as session:
-            for stmt in statements:
-                session.run(stmt)
+        try:
+            statements = [
+                "CREATE INDEX risk_event_id_index IF NOT EXISTS FOR (e:RiskEvent) ON (e.event_id)",
+                "CREATE INDEX supplier_id_index IF NOT EXISTS FOR (s:Supplier) ON (s.supplier_id)",
+                "CREATE INDEX manufacturer_id_index IF NOT EXISTS FOR (m:Manufacturer) ON (m.manufacturer_id)",
+            ]
+            with self._driver.session(database=self._database) as session:
+                for stmt in statements:
+                    session.run(stmt)
+            self._indexes_created = True
+        except Exception as e:
+            logger.warning(f"Failed to create Neo4j indexes: {e}")
 
     def upsert_risk_paths_batch(self, rows: list[dict]) -> None:
         if not self._driver or not rows:
             return
-
+        
+        # Ensure indexes exist on first database operation
+        self._ensure_indexes()
         query = """
         UNWIND $rows AS row
         MERGE (e:RiskEvent {event_id: row.event_id})
@@ -326,6 +339,15 @@ class GraphService:
                 }
             ]
         )
+
+    def clear_graph(self) -> None:
+        if not self._driver:
+            return
+
+        self._ensure_indexes()
+        with self._driver.session(database=self._database) as session:
+            session.run("MATCH (n) DETACH DELETE n")
+        self._indexes_created = False
 
 
 graph_service = GraphService()

@@ -1,11 +1,8 @@
 from datetime import datetime, timedelta, timezone
-
 import httpx
-
 from app.core.config import settings
 from app.ingestion.connectors.base import SourceConnector
 from app.ingestion.schema import NormalizedRecord
-
 
 class ACLEDConnector(SourceConnector):
     name = "acled"
@@ -24,7 +21,7 @@ class ACLEDConnector(SourceConnector):
             return self._access_token
 
         if not settings.acled_username or not settings.acled_password:
-            return None
+            raise RuntimeError("ACLED_USERNAME and ACLED_PASSWORD or ACLED_ACCESS_TOKEN must be configured")
 
         response = await client.post(
             settings.acled_auth_url,
@@ -37,13 +34,13 @@ class ACLEDConnector(SourceConnector):
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         if response.status_code >= 400:
-            return None
+            raise RuntimeError(f"ACLED auth failed with status {response.status_code}")
 
         payload = response.json()
         access_token = payload.get("access_token")
         expires_in = int(payload.get("expires_in", 0))
         if not access_token:
-            return None
+            raise RuntimeError("ACLED auth response did not contain an access token")
 
         self._access_token = access_token
         # Renew one minute earlier to avoid edge expiries.
@@ -57,8 +54,7 @@ class ACLEDConnector(SourceConnector):
             token = await self._get_access_token(client)
             headers = {"Authorization": f"Bearer {token}"} if token else {}
             response = await client.get(settings.acled_base_url, params=params, headers=headers)
-            if response.status_code >= 400:
-                return []
+            response.raise_for_status()
             payload = response.json()
 
         records: list[NormalizedRecord] = []

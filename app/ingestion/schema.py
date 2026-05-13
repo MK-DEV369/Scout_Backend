@@ -1,9 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any
-
 from pydantic import BaseModel, Field
-
-
 class NormalizedRecord(BaseModel):
     source: str
     timestamp: datetime

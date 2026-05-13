@@ -32,21 +32,23 @@ def _extractive_bullets(text: str) -> str:
     return "\n".join(f"- {item[:180]}" for item in bullets)
 
 
-def summarize_as_bullets(text: str) -> str:
+def summarize_as_bullets(text: str) -> tuple[str, float]:
     if not settings.use_llm_summarizer:
-        return _extractive_bullets(text)
+        return _extractive_bullets(text), 0.0
 
     prompt = (
         "Summarize the disruption news into 3 short bullet points with operational impact. "
         "Focus on location, delay duration, and supply chain impact.\n\n"
         f"Article:\n{text[:2200]}\n\n"
         "Answer format:\n"
-        "- ...\n- ...\n- ..."
+        "- ...\n- ...\n- ...\n\n"
+        "Then provide a single confidence score between 0 and 1 on its own line:\n"
+        "Confidence: 0.00"
     )
 
     model = get_summarizer()
     if model is None:
-        return _extractive_bullets(text)
+        return _extractive_bullets(text), 0.0
 
     try:
         outputs = model(prompt, max_new_tokens=110, do_sample=False)
@@ -60,8 +62,14 @@ def summarize_as_bullets(text: str) -> str:
         if gen.startswith(prompt):
             gen = gen[len(prompt):].strip()
 
+        confidence = 0.0
+        confidence_match = re.search(r'(?im)^confidence\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*$', gen, flags=re.MULTILINE)
+        if confidence_match:
+            confidence = float(confidence_match.group(1))
+            gen = re.sub(r'(?im)^confidence\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*$', "", gen).strip()
+
         lines = [l.strip() for l in gen.splitlines() if l.strip()]
-        bullets = []
+        bullets: list[str] = []
         for line in lines:
             if line.startswith("-"):
                 bullets.append(line)
@@ -72,8 +80,8 @@ def summarize_as_bullets(text: str) -> str:
                         bullets.append(f"- {s.strip()}")
 
         if not bullets:
-            return _extractive_bullets(text)
-        return "\n".join(bullets[:3])
+            return _extractive_bullets(text), confidence
+        return "\n".join(bullets[:3]), confidence
     except Exception:
         logger.exception("LLM summarization failed, falling back to extractive bullets")
-        return _extractive_bullets(text)
+        return _extractive_bullets(text), 0.0

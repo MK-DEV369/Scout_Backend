@@ -33,7 +33,7 @@ def health() -> dict:
             neo4j_status = "disconnected"
             neo4j_error = str(exc)
 
-    ingestion_ready = db_status == "connected" or ingestion_service.fallback_path.parent.exists()
+    ingestion_ready = db_status == "connected"
 
     return {
         "status": "ok" if db_status == "connected" else "degraded",

@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "SCOUT"
-    api_v1_prefix: str = "/api/v1"
+    port: int = Field(default=8000, validation_alias=AliasChoices("PORT"))
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@localhost:5432/scout",
         validation_alias=AliasChoices("DATABASE_URL")
@@ -39,7 +39,6 @@ class Settings(BaseSettings):
     ingestion_connector_timeout_seconds: int = 20
     ingestion_job_timeout_seconds: int = 60
     db_connect_timeout_seconds: int = 5
-    ingestion_fallback_path: str = "backend/data/ingestion_fallback.jsonl"
 
     neo4j_uri: str = Field(default="neo4j+s://7bacfc87.databases.neo4j.io", validation_alias=AliasChoices("NEO4J_URI"))
     neo4j_user: str = Field(default="7bacfc87", validation_alias=AliasChoices("NEO4J_USER", "NEO4J_USERNAME"))

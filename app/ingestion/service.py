@@ -1,9 +1,7 @@
 import asyncio
 from collections import Counter
 from collections.abc import Iterable
-import json
 import logging
-from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -39,47 +37,6 @@ class IngestionService:
     def _logger(self) -> logging.Logger:
         return logging.getLogger(__name__)
 
-    @property
-    def fallback_path(self) -> Path:
-        return self._resolve_fallback_path()
-
-    def _resolve_fallback_path(self) -> Path:
-        configured = Path(settings.ingestion_fallback_path)
-        if configured.is_absolute():
-            return configured
-        repo_root = Path(__file__).resolve().parents[3]
-        return repo_root / configured
-
-    def save_fallback(self, records: Iterable[NormalizedRecord], reason: str) -> int:
-        rows = list(records)
-        if not rows:
-            return 0
-
-        target = self._resolve_fallback_path()
-        target.parent.mkdir(parents=True, exist_ok=True)
-
-        written = 0
-        with target.open("a", encoding="utf-8") as handle:
-            for item in rows:
-                handle.write(
-                    json.dumps(
-                        {
-                            "source": item.source,
-                            "source_id": item.source_id,
-                            "timestamp": item.timestamp.isoformat(),
-                            "text": item.text,
-                            "location": item.location,
-                            "metadata": item.metadata,
-                            "content_hash": compute_content_hash(item),
-                            "fallback_reason": reason,
-                        },
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
-                written += 1
-        return written
-
     async def collect(self) -> list[NormalizedRecord]:
         records, _, _ = await self.collect_with_stats()
         return records
@@ -102,14 +59,6 @@ class IngestionService:
             except Exception as exc:  # noqa: BLE001
                 error_message = str(exc)
                 errors.append({"source": connector.name, "error": error_message})
-                records.append(
-                    NormalizedRecord.with_defaults(
-                        source=connector.name,
-                        text=f"connector_error:{connector.name}",
-                        metadata={"error": error_message},
-                        location=None,
-                    )
-                )
 
         return records, dict(source_counts), errors
 
@@ -128,7 +77,6 @@ class IngestionService:
         rows = list(records)
         inserted = 0
         duplicates = 0
-        fallback_saved = 0
 
         try:
             for item in rows:
@@ -161,16 +109,10 @@ class IngestionService:
             db.commit()
         except Exception as exc:  # noqa: BLE001
             db.rollback()
-            fallback_saved = self.save_fallback(rows, reason=f"db_save_error:{exc}")
-            self._logger.exception("DB save failed, wrote fallback records", exc_info=exc)
-            return {
-                "inserted": 0,
-                "duplicates": 0,
-                "fallback_saved": fallback_saved,
-                "db_error": str(exc),
-            }
+            self._logger.exception("DB save failed", exc_info=exc)
+            raise
 
-        return {"inserted": inserted, "duplicates": duplicates, "fallback_saved": fallback_saved}
+        return {"inserted": inserted, "duplicates": duplicates}
 
 
 ingestion_service = IngestionService()

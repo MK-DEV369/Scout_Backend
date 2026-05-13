@@ -1,7 +1,5 @@
 from datetime import datetime, timezone
-
 import httpx
-
 from app.core.config import settings
 from app.ingestion.connectors.base import SourceConnector
 from app.ingestion.schema import NormalizedRecord
