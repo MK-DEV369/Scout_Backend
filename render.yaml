@@ -1,0 +1,52 @@
+services:
+  - type: web
+    runtime: python
+    name: scout-backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Database
+      - key: DATABASE_URL
+        sync: false
+      
+      # API Keys (set in Render dashboard as secrets)
+      - key: NEWSAPI_KEY
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: FREIGHTOS_API_KEY
+        sync: false
+      - key: ACLED_USERNAME
+        sync: false
+      - key: ACLED_PASSWORD
+        sync: false
+      - key: ACLED_ACCESS_TOKEN
+        sync: false
+      
+      # Neo4j Configuration
+      - key: NEO4J_URI
+        value: neo4j+s://7bacfc87.databases.neo4j.io
+      - key: NEO4J_USER
+        value: 7bacfc87
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: NEO4J_DATABASE
+        value: 7bacfc87
+      
+      # Databricks Configuration (set as secrets in dashboard)
+      - key: DATABRICKS_HOST
+        value: https://dbc-d28584e4-22cf.cloud.databricks.com
+      - key: DATABRICKS_TOKEN
+        sync: false
+      - key: DATABRICKS_DEFAULT_JOB_ID
+        value: 577132949372634
+      
+      # Model Configuration (keep defaults for Render free tier)
+      - key: USE_LLM_SUMMARIZER
+        value: "false"
+      - key: LOAD_MISTRAL_ON_STARTUP
+        value: "false"
+      - key: MISTRAL_USE_4BIT
+        value: "false"
